@@ -14,6 +14,7 @@ func Job(jobNamePrefix string, containers []v13.Container) *v1.Job {
 			Namespace: v12.NamespaceDefault,
 		},
 		Spec: v1.JobSpec{
+			BackoffLimit: new(int32),
 			Template: v13.PodTemplateSpec{
 				Spec: v13.PodSpec{
 					RestartPolicy: "Never",

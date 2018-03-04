@@ -8,14 +8,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"fmt"
+	"github.com/wayofthepie/task-executor/pkg/manager"
 )
 
 type KubernetesImpl struct {
 	clientSet kubernetes.Interface
+	manager   manager.Service
 }
 
-func NewKubernetesClientImpl(clientSet kubernetes.Interface) *KubernetesImpl {
-	return &KubernetesImpl{clientSet: clientSet}
+func NewKubernetesClientImpl(clientSet kubernetes.Interface, manager manager.Service) *KubernetesImpl {
+	return &KubernetesImpl{clientSet: clientSet, manager: manager}
 }
 
 func (s *KubernetesImpl) ExecuteTask(spec *task.TaskSpec) (*task.TaskInfo, error) {
@@ -29,12 +31,18 @@ func (s *KubernetesImpl) ExecuteTask(spec *task.TaskSpec) (*task.TaskInfo, error
 	k8sJob := k8s.Job(fmt.Sprintf("%s-", spec.Name), []v1.Container{container})
 	batch := s.clientSet.BatchV1()
 
+	fmt.Printf("Creating job for task %s", spec.Name)
 	createdJob, err := batch.Jobs(v12.NamespaceDefault).Create(k8sJob)
 	if err != nil {
 		return nil, err
 	}
 
-	return &task.TaskInfo{Id: createdJob.Name, Metadata: createdJob}, nil
+	info, err := s.manager.ManageExecutingTask(createdJob.Name, make(chan int))
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
 }
 
 func (s *KubernetesImpl) GetExecutingTaskInfo(taskID string) (*task.TaskInfo, error) {

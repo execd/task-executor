@@ -1,33 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"github.com/wayofthepie/task-executor/pkg/k8s"
 	"github.com/wayofthepie/task-executor/pkg/executor"
-	"github.com/wayofthepie/task-executor/pkg/model/task"
-	"time"
+	"github.com/wayofthepie/task-executor/pkg/execution"
+	"github.com/wayofthepie/task-executor/pkg/event"
 	"log"
-	"k8s.io/api/batch/v1"
 )
 
 func main() {
 	clientSet := k8s.InitializeClientSet()
-	exec := executor.NewKubernetesClientImpl(clientSet)
-	spec := &task.TaskSpec{Name:"test-execution", Image:"alpine", Init:"sleep", InitArgs:[]string{"100"}}
-	job, err := exec.ExecuteTask(spec)
+	kubeExec := executor.NewKubernetesClientImpl(clientSet)
+	conn, _ := event.NewRabbitConnection("amqp://guest:guest@localhost:5672/")
+	ch, _ := conn.Channel()
+	exec, _ := execution.NewServiceImpl(ch, kubeExec)
+	err := exec.ListenForTasks()
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	fmt.Println(job.Metadata.(*v1.Job).Name)
-	fmt.Println("Sleeping...")
-	time.Sleep(time.Second * 10)
-	info, err := exec.GetExecutingTaskInfo(job.Metadata.(*v1.Job).Name)
-	if err!= nil {
-		log.Fatal(err.Error())
-	}
-
-	fmt.Println(info.Metadata.(*v1.Job).Name)
-	fmt.Println(info.Metadata.(*v1.Job).Spec.Template.Spec.Containers[0].Command)
-
-	fmt.Println("Executing!")
+	forever := make(chan bool)
+	<-forever
 }

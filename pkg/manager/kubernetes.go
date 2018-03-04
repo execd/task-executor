@@ -2,10 +2,60 @@ package manager
 
 import (
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"fmt"
+	"errors"
+	v12 "k8s.io/api/batch/v1"
+	"github.com/wayofthepie/task-executor/pkg/model/task"
+	"k8s.io/apimachinery/pkg/watch"
+	v14 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
-type KubernetesImpl struct {
-	clientset kubernetes.Interface
+func NewKubernetesImpl(clientSet kubernetes.Interface) *KubernetesImpl {
+	return &KubernetesImpl{clientSet: clientSet}
 }
 
-func (s *KubernetesImpl) ManageExecutingTask(taskID string) {}
+type KubernetesImpl struct {
+	clientSet kubernetes.Interface
+}
+
+func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*task.TaskInfo, error) {
+	fmt.Printf("Watching for events on task %s", taskID)
+	opts := v1.ListOptions{
+		FieldSelector: fmt.Sprintf("metadata.name=%s", taskID),
+	}
+	jobs := s.clientSet.BatchV1().Jobs(v1.NamespaceDefault)
+	w, err := jobs.Watch(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	events := w.ResultChan()
+	return handleEvent(taskID, events, jobs)
+}
+
+func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface) (*task.TaskInfo, error) {
+	for {
+		select {
+		case event := <-events:
+			switch event.Type {
+			case watch.Deleted:
+				fmt.Println(event.Type)
+				return nil, errors.New("job has been deleted")
+			default:
+				j := event.Object.(*v12.Job)
+				if j.Status.Failed != 0 {
+					err := jobs.Delete(taskID, &v1.DeleteOptions{})
+					if err != nil{
+						return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
+					}
+
+					return &task.TaskInfo{Id:taskID, Metadata:j}, nil
+				}
+				if j.Status.Succeeded > 1 {
+					return &task.TaskInfo{Id:taskID, Metadata:j}, nil
+				}
+			}
+		}
+	}
+}
