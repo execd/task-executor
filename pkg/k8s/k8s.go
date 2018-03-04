@@ -24,10 +24,10 @@ func InitializeClientSet() *kubernetes.Clientset {
 	if err != nil {
 		panic(err)
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
-	return clientset
+	return clientSet
 }
