@@ -11,8 +11,8 @@ import (
 
 func main() {
 	clientSet := k8s.InitializeClientSet()
-	manager := manager.NewKubernetesImpl(clientSet)
-	kubeExec := executor.NewKubernetesClientImpl(clientSet, manager)
+	kubeManager := manager.NewKubernetesImpl(clientSet)
+	kubeExec := executor.NewKubernetesClientImpl(clientSet, kubeManager)
 	conn, _ := event.NewRabbitConnection("amqp://guest:guest@localhost:5672/")
 	ch, _ := conn.Channel()
 	exec, _ := execution.NewServiceImpl(ch, kubeExec)

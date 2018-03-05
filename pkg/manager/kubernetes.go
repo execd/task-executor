@@ -43,21 +43,22 @@ func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface
 		case watch.Deleted:
 			return nil, errors.New("job has been deleted before execution completed")
 		default:
-			j := event.Object.(*v12.Job)
-			if j.Status.Failed != 0 {
+			job := event.Object.(*v12.Job)
+			fmt.Println(job.Status.Failed)
+			if job.Status.Failed != 0 {
 				err := jobs.Delete(taskID, &v1.DeleteOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
 				}
 
-				return &task.Info{ID: taskID, Metadata: j}, nil
+				return &task.Info{ID: taskID, Metadata: job}, nil
 			}
-			if j.Status.Succeeded > 1 {
+			if job.Status.Succeeded >= 1 {
 				err := jobs.Delete(taskID, &v1.DeleteOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", taskID, err.Error())
 				}
-				return &task.Info{ID: taskID, Metadata: j}, nil
+				return &task.Info{ID: taskID, Metadata: job}, nil
 			}
 		}
 	}

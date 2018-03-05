@@ -5,10 +5,13 @@ import (
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/wayofthepie/task-executor/pkg/model/k8s"
 	"github.com/wayofthepie/task-executor/pkg/model/task"
+	v13 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"log"
 	"time"
 )
@@ -22,12 +25,13 @@ var _ = Describe("KubernetesImpl", func() {
 		init := "init.sh"
 		initArgs := []string{"test"}
 		spec := &task.Spec{Image: image, Name: name, Init: init, InitArgs: initArgs}
-		timeout := time.Millisecond * 10
+		timeout := time.Millisecond * 100
 
-		var clientSet *fake.Clientset
+		var k8sJob *v13.Job
+		var manager *KubernetesImpl
+		var clientSet kubernetes.Interface
 
-		It("should return error if job is deleted before execution completes", func() {
-			// Arrange
+		BeforeEach(func() {
 			container := v1.Container{
 				Name:    spec.Name,
 				Image:   spec.Image,
@@ -35,11 +39,13 @@ var _ = Describe("KubernetesImpl", func() {
 				Args:    spec.InitArgs,
 			}
 
-			k8sJob := k8s.Job(spec.Name, []v1.Container{container})
+			k8sJob = k8s.Job(spec.Name, []v1.Container{container})
 			clientSet = fake.NewSimpleClientset(k8sJob)
-			manager := NewKubernetesImpl(clientSet)
+			manager = NewKubernetesImpl(clientSet)
+		})
 
-			// Act
+		It("should return error if job is deleted before execution completes", func() {
+			// Arrange
 			successChan := make(chan bool, 2)
 
 			go func() {
@@ -58,6 +64,63 @@ var _ = Describe("KubernetesImpl", func() {
 			failOnError(err)
 
 			waitForResult(time.After(timeout), successChan)
+		})
+
+		It("should return task information if job succeeds", func() {
+			// Arrange
+			successChan := make(chan bool, 2)
+
+			go func() {
+				defer GinkgoRecover()
+				// Act
+				info, err := manager.ManageExecutingTask(k8sJob.Name, make(chan int))
+
+				// Assert
+				retrievedJob := info.Metadata.(*v13.Job)
+				assert.Nil(context, err)
+				assert.Equal(context, int32(1), retrievedJob.Status.Succeeded)
+				assert.Equal(context, name, retrievedJob.GenerateName)
+				successChan <- true
+			}()
+
+			time.Sleep(timeout) // we need to wait so the watch job gets the event
+			jobUpdate := *k8sJob
+			jobUpdate.Status = v13.JobStatus{
+				Succeeded: 1,
+			}
+			fmt.Println(jobUpdate.Name)
+			_, err := clientSet.BatchV1().Jobs(v1.NamespaceDefault).UpdateStatus(&jobUpdate)
+			failOnError(err)
+
+			waitForResult(time.After(time.Second*1), successChan)
+		})
+
+		It("should return info if job fails", func() {
+			// Arrange
+			successChan := make(chan bool, 2)
+
+			go func() {
+				defer GinkgoRecover()
+				// Act
+				info, err := manager.ManageExecutingTask(k8sJob.Name, make(chan int))
+
+				// Assert
+				retrievedJob := info.Metadata.(*v13.Job)
+				assert.Nil(context, err)
+				assert.Equal(context, int32(1), retrievedJob.Status.Failed)
+				successChan <- true
+			}()
+
+			time.Sleep(timeout) // we need to wait so the watch job gets the event
+			jobUpdate := *k8sJob
+			jobUpdate.Status = v13.JobStatus{
+				Failed: 1,
+			}
+			fmt.Println(jobUpdate.Name)
+			_, err := clientSet.BatchV1().Jobs(v1.NamespaceDefault).UpdateStatus(&jobUpdate)
+			failOnError(err)
+
+			waitForResult(time.After(time.Second*1), successChan)
 		})
 	})
 })
