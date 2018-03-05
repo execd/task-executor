@@ -11,16 +11,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// KubernetesImpl : kubernetes implementation of an executor
 type KubernetesImpl struct {
 	clientSet kubernetes.Interface
 	manager   manager.Service
 }
 
+// NewKubernetesClientImpl : build a KubernetesImpl
 func NewKubernetesClientImpl(clientSet kubernetes.Interface, manager manager.Service) *KubernetesImpl {
 	return &KubernetesImpl{clientSet: clientSet, manager: manager}
 }
 
-func (s *KubernetesImpl) ExecuteTask(spec *task.TaskSpec) (*task.TaskInfo, error) {
+// ExecuteTask : execute a task
+func (s *KubernetesImpl) ExecuteTask(spec *task.Spec) (*task.Info, error) {
 	container := v1.Container{
 		Name:    spec.Name,
 		Image:   spec.Image,
@@ -45,10 +48,11 @@ func (s *KubernetesImpl) ExecuteTask(spec *task.TaskSpec) (*task.TaskInfo, error
 	return info, nil
 }
 
-func (s *KubernetesImpl) GetExecutingTaskInfo(taskID string) (*task.TaskInfo, error) {
+// GetExecutingTaskInfo : get information on an executing task
+func (s *KubernetesImpl) GetExecutingTaskInfo(taskID string) (*task.Info, error) {
 	job, err := s.clientSet.BatchV1().Jobs(v12.NamespaceDefault).Get(taskID, v12.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return &task.TaskInfo{Id: job.Name, Metadata: job}, nil
+	return &task.Info{ID: job.Name, Metadata: job}, nil
 }

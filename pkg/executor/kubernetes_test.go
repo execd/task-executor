@@ -18,7 +18,7 @@ var _ = Describe("KubernetesImpl", func() {
 		var image string
 		var init string
 		var initArgs []string
-		var spec *task.TaskSpec
+		var spec *task.Spec
 		var clientSet *fake.Clientset
 		var managerMock *manager.Service
 		var service *KubernetesImpl
@@ -28,7 +28,7 @@ var _ = Describe("KubernetesImpl", func() {
 			image = "alpine"
 			init = "init.sh"
 			initArgs = []string{"test"}
-			spec = &task.TaskSpec{Image: image, Name: name, Init: init, InitArgs: initArgs}
+			spec = &task.Spec{Image: image, Name: name, Init: init, InitArgs: initArgs}
 			clientSet = fake.NewSimpleClientset()
 			managerMock = &manager.Service{}
 			service = NewKubernetesClientImpl(clientSet, managerMock)

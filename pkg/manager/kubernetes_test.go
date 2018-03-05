@@ -21,7 +21,7 @@ var _ = Describe("KubernetesImpl", func() {
 		image := "alpine"
 		init := "init.sh"
 		initArgs := []string{"test"}
-		spec := &task.TaskSpec{Image: image, Name: name, Init: init, InitArgs: initArgs}
+		spec := &task.Spec{Image: image, Name: name, Init: init, InitArgs: initArgs}
 		timeout := time.Millisecond * 10
 
 		var clientSet *fake.Clientset

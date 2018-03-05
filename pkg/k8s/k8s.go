@@ -4,12 +4,14 @@ import (
 	"flag"
 	"github.com/kubernetes/client-go/util/homedir"
 	"k8s.io/client-go/kubernetes"
+	// Neccessary to build gcp auth
+	// TODO remove this when ready
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/clientcmd"
 	"path/filepath"
 )
 
-// Read kube config and initialize a clientset
+// InitializeClientSet : read kube config and initialize a clientset
 func InitializeClientSet() *kubernetes.Clientset {
 	var kubeconfig *string
 	if home := homedir.HomeDir(); home != "" {

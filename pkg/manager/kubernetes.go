@@ -11,15 +11,18 @@ import (
 	v14 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
+// NewKubernetesImpl : build a new kubernetes manager impl
 func NewKubernetesImpl(clientSet kubernetes.Interface) *KubernetesImpl {
 	return &KubernetesImpl{clientSet: clientSet}
 }
 
+// KubernetesImpl : kubernetes implementation of a task manager
 type KubernetesImpl struct {
 	clientSet kubernetes.Interface
 }
 
-func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*task.TaskInfo, error) {
+// ManageExecutingTask : manages the task with the given task id
+func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*task.Info, error) {
 	fmt.Printf("Watching for events on task %s", taskID)
 	opts := v1.ListOptions{
 		FieldSelector: fmt.Sprintf("metadata.name=%s", taskID),
@@ -34,7 +37,7 @@ func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*tas
 	return handleEvent(taskID, events, jobs)
 }
 
-func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface) (*task.TaskInfo, error) {
+func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface) (*task.Info, error) {
 	for event := range events {
 		switch event.Type {
 		case watch.Deleted:
@@ -47,17 +50,16 @@ func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface
 					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
 				}
 
-				return &task.TaskInfo{Id: taskID, Metadata: j}, nil
+				return &task.Info{ID: taskID, Metadata: j}, nil
 			}
 			if j.Status.Succeeded > 1 {
 				err := jobs.Delete(taskID, &v1.DeleteOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", taskID, err.Error())
 				}
-				return &task.TaskInfo{Id: taskID, Metadata: j}, nil
+				return &task.Info{ID: taskID, Metadata: j}, nil
 			}
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("An error occurred managing task %s", taskID))
+	return nil, fmt.Errorf("an error occurred managing task %s", taskID)
 }
-
