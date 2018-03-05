@@ -2,12 +2,12 @@ package executor
 
 import (
 	. "github.com/onsi/ginkgo"
-	"k8s.io/client-go/kubernetes/fake"
-	"github.com/wayofthepie/task-executor/pkg/model/task"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/pkg/errors"
 	"github.com/wayofthepie/task-executor/mocks/manager"
+	"github.com/wayofthepie/task-executor/pkg/model/task"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 var context = GinkgoT()

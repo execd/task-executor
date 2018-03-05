@@ -2,12 +2,11 @@ package k8s
 
 import (
 	"flag"
-	"path/filepath"
 	"github.com/kubernetes/client-go/util/homedir"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-
+	"k8s.io/client-go/tools/clientcmd"
+	"path/filepath"
 )
 
 // Read kube config and initialize a clientset

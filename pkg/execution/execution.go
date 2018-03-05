@@ -1,16 +1,16 @@
 package execution
 
 import (
+	"fmt"
 	"github.com/NeowayLabs/wabbit"
 	"github.com/wayofthepie/task-executor/pkg/executor"
 	"github.com/wayofthepie/task-executor/pkg/model/task"
 	"log"
-	"fmt"
 )
 
 const queueName = "work_queue"
 
-type Service interface{
+type Service interface {
 	ListenForTasks() error
 }
 

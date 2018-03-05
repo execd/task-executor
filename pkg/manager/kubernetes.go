@@ -1,13 +1,13 @@
 package manager
 
 import (
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"fmt"
 	"errors"
-	v12 "k8s.io/api/batch/v1"
+	"fmt"
 	"github.com/wayofthepie/task-executor/pkg/model/task"
+	v12 "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
 	v14 "k8s.io/client-go/kubernetes/typed/batch/v1"
 )
 
@@ -35,27 +35,29 @@ func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*tas
 }
 
 func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface) (*task.TaskInfo, error) {
-	for {
-		select {
-		case event := <-events:
-			switch event.Type {
-			case watch.Deleted:
-				fmt.Println(event.Type)
-				return nil, errors.New("job has been deleted")
-			default:
-				j := event.Object.(*v12.Job)
-				if j.Status.Failed != 0 {
-					err := jobs.Delete(taskID, &v1.DeleteOptions{})
-					if err != nil{
-						return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
-					}
+	for event := range events {
+		switch event.Type {
+		case watch.Deleted:
+			return nil, errors.New("job has been deleted before execution completed")
+		default:
+			j := event.Object.(*v12.Job)
+			if j.Status.Failed != 0 {
+				err := jobs.Delete(taskID, &v1.DeleteOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
+				}
 
-					return &task.TaskInfo{Id:taskID, Metadata:j}, nil
+				return &task.TaskInfo{Id: taskID, Metadata: j}, nil
+			}
+			if j.Status.Succeeded > 1 {
+				err := jobs.Delete(taskID, &v1.DeleteOptions{})
+				if err != nil {
+					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", taskID, err.Error())
 				}
-				if j.Status.Succeeded > 1 {
-					return &task.TaskInfo{Id:taskID, Metadata:j}, nil
-				}
+				return &task.TaskInfo{Id: taskID, Metadata: j}, nil
 			}
 		}
 	}
+	return nil, errors.New(fmt.Sprintf("An error occurred managing task %s", taskID))
 }
+

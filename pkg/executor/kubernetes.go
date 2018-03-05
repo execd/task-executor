@@ -1,14 +1,14 @@
 package executor
 
 import (
-	"github.com/wayofthepie/task-executor/pkg/model/task"
 	"github.com/wayofthepie/task-executor/pkg/model/k8s"
+	"github.com/wayofthepie/task-executor/pkg/model/task"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"fmt"
 	"github.com/wayofthepie/task-executor/pkg/manager"
+	"k8s.io/api/core/v1"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 type KubernetesImpl struct {
