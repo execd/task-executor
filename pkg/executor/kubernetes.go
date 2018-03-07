@@ -22,8 +22,9 @@ func NewKubernetesClientImpl(clientSet kubernetes.Interface, manager manager.Ser
 	return &KubernetesImpl{clientSet: clientSet, manager: manager}
 }
 
-// ExecuteTask : execute a task
-func (s *KubernetesImpl) ExecuteTask(spec *task.Spec) (*task.Info, error) {
+// Execute : execute a task
+func (s *KubernetesImpl) ExecuteTask(executable Executable) (*task.Info, error) {
+	spec := executable.GetTask()
 	container := v1.Container{
 		Name:    spec.Name,
 		Image:   spec.Image,
@@ -34,7 +35,7 @@ func (s *KubernetesImpl) ExecuteTask(spec *task.Spec) (*task.Info, error) {
 	k8sJob := k8s.Job(fmt.Sprintf("%s-", spec.Name), []v1.Container{container})
 	batch := s.clientSet.BatchV1()
 
-	fmt.Printf("Creating job for task %s", spec.Name)
+	fmt.Printf("Creating job for task %s\n", spec.Name)
 	createdJob, err := batch.Jobs(v12.NamespaceDefault).Create(k8sJob)
 	if err != nil {
 		return nil, err

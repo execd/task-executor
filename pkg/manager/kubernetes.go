@@ -23,7 +23,7 @@ type KubernetesImpl struct {
 
 // ManageExecutingTask : manages the task with the given task id
 func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*task.Info, error) {
-	fmt.Printf("Watching for events on task %s", taskID)
+	fmt.Printf("Watching for events on task %s \n", taskID)
 	opts := v1.ListOptions{
 		FieldSelector: fmt.Sprintf("metadata.name=%s", taskID),
 	}
@@ -44,8 +44,8 @@ func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface
 			return nil, errors.New("job has been deleted before execution completed")
 		default:
 			job := event.Object.(*v12.Job)
-			fmt.Println(job.Status.Failed)
 			if job.Status.Failed != 0 {
+				fmt.Printf("Task %s failed.\n", job.Name)
 				err := jobs.Delete(taskID, &v1.DeleteOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
@@ -54,6 +54,7 @@ func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface
 				return &task.Info{ID: taskID, Metadata: job}, nil
 			}
 			if job.Status.Succeeded >= 1 {
+				fmt.Printf("Task %s succeeded.\n", job.Name)
 				err := jobs.Delete(taskID, &v1.DeleteOptions{})
 				if err != nil {
 					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", taskID, err.Error())

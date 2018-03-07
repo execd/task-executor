@@ -13,7 +13,7 @@ import (
 var context = GinkgoT()
 
 var _ = Describe("KubernetesImpl", func() {
-	Describe("ExecuteTask", func() {
+	Describe("Execute", func() {
 		var name string
 		var image string
 		var init string
@@ -22,6 +22,7 @@ var _ = Describe("KubernetesImpl", func() {
 		var clientSet *fake.Clientset
 		var managerMock *manager.Service
 		var service *KubernetesImpl
+		var executable Executable
 
 		BeforeEach(func() {
 			name = "test"
@@ -29,6 +30,7 @@ var _ = Describe("KubernetesImpl", func() {
 			init = "init.sh"
 			initArgs = []string{"test"}
 			spec = &task.Spec{Image: image, Name: name, Init: init, InitArgs: initArgs}
+			executable = NewExecutableImpl(spec)
 			clientSet = fake.NewSimpleClientset()
 			managerMock = &manager.Service{}
 			service = NewKubernetesClientImpl(clientSet, managerMock)
@@ -39,7 +41,7 @@ var _ = Describe("KubernetesImpl", func() {
 			managerMock.On("ManageExecutingTask", "", mock.Anything).Return(nil, nil)
 
 			// Act
-			service.ExecuteTask(spec)
+			service.ExecuteTask(executable)
 
 			// Assert
 			managerMock.AssertNumberOfCalls(context, "ManageExecutingTask", 1)
@@ -51,7 +53,7 @@ var _ = Describe("KubernetesImpl", func() {
 			managerMock.On("ManageExecutingTask", "", mock.Anything).Return(nil, expectedErr)
 
 			// Act
-			_, err := service.ExecuteTask(spec)
+			_, err := service.ExecuteTask(executable)
 
 			// Assert
 			assert.NotNil(context, err)
