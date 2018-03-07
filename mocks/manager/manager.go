@@ -9,13 +9,13 @@ type Service struct {
 	mock.Mock
 }
 
-// ManageExecutingTask provides a mock function with given fields: taskID, quit
-func (_m *Service) ManageExecutingTask(taskID string, quit chan int) (*task.Info, error) {
-	ret := _m.Called(taskID, quit)
+// ManageExecutingTask provides a mock function with given fields: taskInfo, quit
+func (_m *Service) ManageExecutingTask(taskInfo task.Info, quit chan int) (*task.Info, error) {
+	ret := _m.Called(taskInfo, quit)
 
 	var r0 *task.Info
-	if rf, ok := ret.Get(0).(func(string, chan int) *task.Info); ok {
-		r0 = rf(taskID, quit)
+	if rf, ok := ret.Get(0).(func(task.Info, chan int) *task.Info); ok {
+		r0 = rf(taskInfo, quit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*task.Info)
@@ -23,8 +23,8 @@ func (_m *Service) ManageExecutingTask(taskID string, quit chan int) (*task.Info
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, chan int) error); ok {
-		r1 = rf(taskID, quit)
+	if rf, ok := ret.Get(1).(func(task.Info, chan int) error); ok {
+		r1 = rf(taskInfo, quit)
 	} else {
 		r1 = ret.Error(1)
 	}

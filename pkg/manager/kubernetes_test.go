@@ -6,6 +6,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"fmt"
+	"github.com/satori/go.uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/wayofthepie/task-executor/pkg/model/k8s"
 	"github.com/wayofthepie/task-executor/pkg/model/task"
@@ -30,7 +31,7 @@ var _ = Describe("KubernetesImpl", func() {
 		var k8sJob *v13.Job
 		var manager *KubernetesImpl
 		var clientSet kubernetes.Interface
-
+		var taskInfo task.Info
 		BeforeEach(func() {
 			container := v1.Container{
 				Name:    spec.Name,
@@ -42,6 +43,11 @@ var _ = Describe("KubernetesImpl", func() {
 			k8sJob = k8s.Job(spec.Name, []v1.Container{container})
 			clientSet = fake.NewSimpleClientset(k8sJob)
 			manager = NewKubernetesImpl(clientSet)
+			uuid := uuid.Must(uuid.NewV4())
+			taskInfo = task.Info{
+				ID:       &uuid,
+				Metadata: k8sJob,
+			}
 		})
 
 		It("should return error if job is deleted before execution completes", func() {
@@ -51,7 +57,7 @@ var _ = Describe("KubernetesImpl", func() {
 			go func() {
 				defer GinkgoRecover()
 				// Act
-				_, err := manager.ManageExecutingTask(k8sJob.Name, make(chan int))
+				_, err := manager.ManageExecutingTask(taskInfo, make(chan int))
 
 				// Assert
 				assert.NotNil(context, err)
@@ -73,7 +79,7 @@ var _ = Describe("KubernetesImpl", func() {
 			go func() {
 				defer GinkgoRecover()
 				// Act
-				info, err := manager.ManageExecutingTask(k8sJob.Name, make(chan int))
+				info, err := manager.ManageExecutingTask(taskInfo, make(chan int))
 
 				// Assert
 				retrievedJob := info.Metadata.(*v13.Job)
@@ -102,7 +108,7 @@ var _ = Describe("KubernetesImpl", func() {
 			go func() {
 				defer GinkgoRecover()
 				// Act
-				info, err := manager.ManageExecutingTask(k8sJob.Name, make(chan int))
+				info, err := manager.ManageExecutingTask(taskInfo, make(chan int))
 
 				// Assert
 				retrievedJob := info.Metadata.(*v13.Job)

@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/wayofthepie/task-executor/pkg/event"
 	"github.com/wayofthepie/task-executor/pkg/executor"
-	"github.com/wayofthepie/task-executor/pkg/manager"
 	"github.com/wayofthepie/task-executor/pkg/k8s"
+	"github.com/wayofthepie/task-executor/pkg/manager"
 )
 
 func main() {

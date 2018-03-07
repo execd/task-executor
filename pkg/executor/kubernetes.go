@@ -22,7 +22,7 @@ func NewKubernetesClientImpl(clientSet kubernetes.Interface, manager manager.Ser
 	return &KubernetesImpl{clientSet: clientSet, manager: manager}
 }
 
-// Execute : execute a task
+// ExecuteTask : execute and executable
 func (s *KubernetesImpl) ExecuteTask(executable Executable) (*task.Info, error) {
 	spec := executable.GetTask()
 	container := v1.Container{
@@ -41,19 +41,15 @@ func (s *KubernetesImpl) ExecuteTask(executable Executable) (*task.Info, error) 
 		return nil, err
 	}
 
-	info, err := s.manager.ManageExecutingTask(createdJob.Name, make(chan int))
+	initialTaskInfo := task.Info{
+		ID:       executable.GetTask().ID,
+		Metadata: createdJob,
+	}
+
+	info, err := s.manager.ManageExecutingTask(initialTaskInfo, make(chan int))
 	if err != nil {
 		return nil, err
 	}
 
 	return info, nil
-}
-
-// GetExecutingTaskInfo : get information on an executing task
-func (s *KubernetesImpl) GetExecutingTaskInfo(taskID string) (*task.Info, error) {
-	job, err := s.clientSet.BatchV1().Jobs(v12.NamespaceDefault).Get(taskID, v12.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return &task.Info{ID: job.Name, Metadata: job}, nil
 }

@@ -22,10 +22,11 @@ type KubernetesImpl struct {
 }
 
 // ManageExecutingTask : manages the task with the given task id
-func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*task.Info, error) {
-	fmt.Printf("Watching for events on task %s \n", taskID)
+func (s *KubernetesImpl) ManageExecutingTask(taskInfo task.Info, quit chan int) (*task.Info, error) {
+	jobID := taskInfo.Metadata.(*v12.Job).Name
+	fmt.Printf("Watching for events on task %s \n", jobID)
 	opts := v1.ListOptions{
-		FieldSelector: fmt.Sprintf("metadata.name=%s", taskID),
+		FieldSelector: fmt.Sprintf("metadata.name=%s", jobID),
 	}
 	jobs := s.clientSet.BatchV1().Jobs(v1.NamespaceDefault)
 	w, err := jobs.Watch(opts)
@@ -34,10 +35,11 @@ func (s *KubernetesImpl) ManageExecutingTask(taskID string, quit chan int) (*tas
 	}
 
 	events := w.ResultChan()
-	return handleEvent(taskID, events, jobs)
+	return s.handleEvent(&taskInfo, events, jobs)
 }
 
-func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface) (*task.Info, error) {
+func (s *KubernetesImpl) handleEvent(taskInfo *task.Info, events <-chan watch.Event, jobs v14.JobInterface) (*task.Info, error) {
+	jobID := taskInfo.Metadata.(*v12.Job).Name
 	for event := range events {
 		switch event.Type {
 		case watch.Deleted:
@@ -46,22 +48,70 @@ func handleEvent(taskID string, events <-chan watch.Event, jobs v14.JobInterface
 			job := event.Object.(*v12.Job)
 			if job.Status.Failed != 0 {
 				fmt.Printf("Task %s failed.\n", job.Name)
-				err := jobs.Delete(taskID, &v1.DeleteOptions{})
+
+				stats := s.findFailureCause(job)
+
+				err := jobs.Delete(jobID, &v1.DeleteOptions{})
 				if err != nil {
-					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", taskID, err.Error())
+					return nil, fmt.Errorf("cleanup for failed task %s failed : %s", jobID, err.Error())
 				}
 
-				return &task.Info{ID: taskID, Metadata: job}, nil
+				return buildResultInfo(taskInfo, job, false, stats), nil
 			}
 			if job.Status.Succeeded >= 1 {
 				fmt.Printf("Task %s succeeded.\n", job.Name)
-				err := jobs.Delete(taskID, &v1.DeleteOptions{})
+
+				err := jobs.Delete(jobID, &v1.DeleteOptions{})
 				if err != nil {
-					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", taskID, err.Error())
+					return nil, fmt.Errorf("cleanup for successful task %s failed : %s", jobID, err.Error())
 				}
-				return &task.Info{ID: taskID, Metadata: job}, nil
+
+				return buildResultInfo(taskInfo, job, true, nil), nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("an error occurred managing task %s", taskID)
+	return nil, fmt.Errorf("an error occurred managing task %s", jobID)
+}
+
+func (s *KubernetesImpl) findFailureCause(failedJob *v12.Job) *task.FailureStatus {
+	name := failedJob.Name
+	core := s.clientSet.CoreV1()
+	opts := v1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", name),
+	}
+	pods, err := core.Pods(v1.NamespaceDefault).List(opts)
+	if err != nil {
+		stats := &task.FailureStatus{
+			Type:   "CouldNotFindCause",
+			Reason: fmt.Sprintf("Failed to list pods related to job %s", name),
+		}
+		return stats
+	}
+
+	var parentStats *task.FailureStatus
+	for _, pod := range pods.Items {
+		var childStats task.FailureStatus
+		parentStats = &task.FailureStatus{
+			Type: "pod",
+			Name: fmt.Sprintf("job (%s) pod (%s) failure", name, pod.Name),
+		}
+
+		for _, containerStat := range pod.Status.ContainerStatuses {
+			childStats = task.FailureStatus{
+				Type:    "container",
+				Name:    fmt.Sprintf("job (%s) pod (%s) container (%s) failure", name, pod.Name, containerStat.Name),
+				Message: containerStat.State.Terminated.Message,
+				Reason:  containerStat.State.Terminated.Reason,
+			}
+		}
+		parentStats.ChildStatus = append(parentStats.ChildStatus, childStats)
+	}
+	return parentStats
+}
+
+func buildResultInfo(taskInfo *task.Info, job *v12.Job, success bool, status *task.FailureStatus) *task.Info {
+	taskInfo.Metadata = job
+	taskInfo.Succeeded = success
+	taskInfo.FailureStats = status
+	return taskInfo
 }

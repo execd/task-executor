@@ -38,7 +38,7 @@ var _ = Describe("KubernetesImpl", func() {
 
 		It("should manage the execution of the task", func() {
 			// Arrange
-			managerMock.On("ManageExecutingTask", "", mock.Anything).Return(nil, nil)
+			managerMock.On("ManageExecutingTask", mock.AnythingOfType("Info"), mock.Anything).Return(nil, nil)
 
 			// Act
 			service.ExecuteTask(executable)
@@ -50,7 +50,7 @@ var _ = Describe("KubernetesImpl", func() {
 		It("should return error if management of task fails", func() {
 			// Arrange
 			expectedErr := errors.New("error")
-			managerMock.On("ManageExecutingTask", "", mock.Anything).Return(nil, expectedErr)
+			managerMock.On("ManageExecutingTask", mock.AnythingOfType("Info"), mock.Anything).Return(nil, expectedErr)
 
 			// Act
 			_, err := service.ExecuteTask(executable)

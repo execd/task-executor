@@ -4,24 +4,29 @@ import (
 	"fmt"
 	"github.com/NeowayLabs/wabbit"
 	"github.com/NeowayLabs/wabbit/amqp"
+	"github.com/wayofthepie/task-executor/pkg/model/task"
 	"log"
 )
 
 const queueName = "work_queue"
 
+// RabbitService : interface for building rabbit services
 type RabbitService interface {
-	GetChannel() wabbit.Channel
 	GetWorkQueueChan() <-chan wabbit.Delivery
+	PublishTaskStatus(info *task.Info) error
 }
 
+// RabbitServiceImpl : service to interact with rabbit
 type RabbitServiceImpl struct {
-	connection    wabbit.Conn
-	channel       wabbit.Channel
-	workQueueChan <-chan wabbit.Delivery
-	workQueueName string
+	connection          wabbit.Conn
+	channel             wabbit.Channel
+	taskStatusQueue     wabbit.Queue
+	taskStatusQueueName string
+	workQueueChan       <-chan wabbit.Delivery
+	workQueueName       string
 }
 
-// NewRabbitConnection : build a new connection to rabbitmq
+// NewRabbitServiceImpl : build a new connection to rabbitmq
 func NewRabbitServiceImpl(address string) (*RabbitServiceImpl, error) {
 
 	r := &RabbitServiceImpl{}
@@ -30,12 +35,21 @@ func NewRabbitServiceImpl(address string) (*RabbitServiceImpl, error) {
 	return r, nil
 }
 
-func (r *RabbitServiceImpl) GetChannel() wabbit.Channel {
-	return r.channel
-}
-
+// GetWorkQueueChan : get the work queue channel
 func (r *RabbitServiceImpl) GetWorkQueueChan() <-chan wabbit.Delivery {
 	return r.workQueueChan
+}
+
+// PublishTaskStatus : publish task status on the task status queue
+func (r *RabbitServiceImpl) PublishTaskStatus(info *task.Info) error {
+	data, err := info.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	opts := wabbit.Option{
+		"contentType": "application/json",
+	}
+	return r.channel.Publish("", r.taskStatusQueueName, data, opts)
 }
 
 func (r *RabbitServiceImpl) initialize(address string) {
@@ -58,7 +72,14 @@ func (r *RabbitServiceImpl) initialize(address string) {
 		panic("cannot create channel")
 	}
 
-	q, err := ch.QueueDeclare(
+	r.connection = conn
+	r.channel = ch
+	r.initializeWorkQueueConsumer()
+	r.declareTaskQueue()
+}
+
+func (r *RabbitServiceImpl) initializeWorkQueueConsumer() {
+	workQueue, err := r.channel.QueueDeclare(
 		queueName,
 		wabbit.Option{
 			"durable":    true,
@@ -67,14 +88,17 @@ func (r *RabbitServiceImpl) initialize(address string) {
 			"noWait":     false,
 		},
 	)
-	ch.Qos(
+	r.channel.Qos(
 		5,     // prefetch count
 		0,     // prefetch size
 		false, // global
 	)
+	if err != nil {
+		panic("Could not setup work_queue")
+	}
 
-	msgs, err := ch.Consume(
-		q.Name(),
+	workQueueChan, err := r.channel.Consume(
+		workQueue.Name(),
 		"",
 		wabbit.Option{
 			"auto-ack":  false,
@@ -84,11 +108,26 @@ func (r *RabbitServiceImpl) initialize(address string) {
 		},
 	)
 	if err != nil {
-		panic("Could not consumer work_queue")
+		panic("Could not setup work_queue consumer")
 	}
+	r.workQueueChan = workQueueChan
+	r.workQueueName = workQueue.Name()
+}
 
-	r.connection = conn
-	r.channel = ch
-	r.workQueueChan = msgs
-	r.workQueueName = queueName
+func (r *RabbitServiceImpl) declareTaskQueue() {
+	name := "task_status_queue"
+	taskStatusQueue, err := r.channel.QueueDeclare(
+		name,
+		wabbit.Option{
+			"durable":    true,
+			"autoDelete": false,
+			"exclusive":  false,
+			"noWait":     false,
+		},
+	)
+	if err != nil {
+		panic("Could not setup work_queue")
+	}
+	r.taskStatusQueue = taskStatusQueue
+	r.taskStatusQueueName = name
 }
