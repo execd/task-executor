@@ -34,7 +34,7 @@ type Info struct {
 	ID           *uuid.UUID     `json:"id"`
 	Metadata     interface{}    `json:"metadata"`
 	Succeeded    bool           `json:"succeeded"`
-	FailureStats *FailureStatus `json:"failureStats"`
+	FailureStats *FailureStatus `json:"failureStats,omitempty"`
 }
 
 // MarshalBinary marshals a Spec

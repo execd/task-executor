@@ -58,7 +58,7 @@ func (s *ServiceImpl) handleMsg(msg wabbit.Delivery) {
 	} else {
 		log.Printf("error unmarshalling msg %s : %s", string(msg.Body()[:]), err.Error())
 		unmarshalFailureInfo := &task.Info{
-			Metadata: taskSpec,
+			Metadata: string(msg.Body()),
 			FailureStats: &task.FailureStatus{
 				Name:    "unmarshal failure",
 				Type:    "UnmarshalFailure",
